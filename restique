@@ -12,12 +12,12 @@ import shutil
 from pathlib import Path
 
 __PROG__ = 'restique'
-__VERSION__ = '0.0.1'
+__version__ = '0.0.1'
 
 pp = pprint.PrettyPrinter(width=80)
 
-def fatal_exit(msg = 'An error occurred'):
-    logging.error(msg)
+def fatal_exit(msg = 'An error occurred', *args):
+    logging.error(msg, *args)
     sys.exit(1)
 
 def get_config_file_path(args):
@@ -26,7 +26,7 @@ def get_config_file_path(args):
         if p.is_file():
             return str(p)
         else:
-            fatal_exit('No config file located at \'' + args.config + '\'')
+            fatal_exit("No config file located at '%s'", args.config)
 
     config_paths = [
         './.restiquerc',
@@ -40,7 +40,7 @@ def get_config_file_path(args):
         if file_path.is_file():
             return str(file_path)
 
-    fatal_exit('Couldn\'t find a config file. Valid config file locations are ' + str(config_paths) + ' or specified through the --config argument')
+    fatal_exit("Couldn't find a config file. Valid config file locations are %s or specified through the --config argument", config_paths)
 
 profile_field_types = {
     'json': bool,
@@ -95,7 +95,7 @@ def merge_profiles(p1, p2):
             merged_profile[key] = new_value
 
         else:
-            new_value = p1[key] if key in p1 else None;
+            new_value = p1[key] if key in p1 else None
             if key in p2:
                 new_value = p2[key]
             merged_profile[key] = new_value
@@ -106,10 +106,10 @@ def get_profile_config(config, profile_name):
     default_config = config['global'] if 'global' in config else {}
     profiles = config['profiles'] if 'profiles' in config else {}
     default_profile_name = config['default_profile'] if 'default_profile' in config else None
-    restic_path = config['restic_path'] if 'restic_path' in config else None;
+    restic_path = config['restic_path'] if 'restic_path' in config else None
 
     if not profile_name and not default_profile_name:
-        fatal_exit('Profile not specified or no \'default_profile\'')
+        fatal_exit("Profile not specified or no 'default_profile'")
 
     profile_name = profile_name if profile_name else default_profile_name
 
@@ -117,9 +117,9 @@ def get_profile_config(config, profile_name):
 
     for pname in profile_name.split(','):
         if not pname in profiles.keys():
-            fatal_exit('Profile \'' + pname + '\' not found')
+            fatal_exit("Profile '%s' not found", pname)
 
-        logging.debug('Merging profile \'' + pname + '\'')
+        logging.debug("Merging profile %r", pname)
         profile_config = merge_profiles(profile_config, profiles[pname])
 
     profile_config['restic_path'] = restic_path
@@ -132,11 +132,11 @@ def check_config(config, required_keys = []):
         'repository',
     ]
 
-    all_required_keys = minimum_required_keys + required_keys;
+    all_required_keys = minimum_required_keys + required_keys
 
     for key in all_required_keys:
         if not key in config:
-            fatal_exit('Missing required config option \'' + key + '\'')
+            fatal_exit("Missing required config option '%s'", key )
 
     if config['repository'].startswith('swift:'):
         fatal_exit('OpenStack Swift repositories are currently not supported')
@@ -150,7 +150,7 @@ def check_forbidden_args(args, forbidden = []):
 
     for key in args:
         if key in all_forbidden_args:
-            fatal_exit('Argument \'' + key + '\' is currently not supported')
+            fatal_exit("Argument '%s' is currently not supported", key)
 
 def get_restic_path(config):
     p = config['restic_path'] if 'restic_path' in config and config['restic_path'] != None else 'restic'
@@ -158,7 +158,7 @@ def get_restic_path(config):
     if not restic_path:
         fatal_exit('restic executable path not found')
 
-    logging.debug('Restic path: \'' + restic_path + '\'')
+    logging.debug('Restic path: %r', restic_path)
     return restic_path
 
 def get_process(cmd, env = {}):
@@ -177,7 +177,7 @@ def get_process(cmd, env = {}):
     return process
 
 def run_quiet_command(cmd, env = {}):
-    logging.debug('Quiet command: ' + ' '.join(cmd))
+    logging.debug('Quiet command: %r', ' '.join(cmd))
 
     p = subprocess.run(
         cmd,
@@ -188,7 +188,7 @@ def run_quiet_command(cmd, env = {}):
     return p.returncode
 
 def run_interactive_command(cmd, env = {}):
-    logging.debug('Interactive command: ' + ' '.join(cmd))
+    logging.debug('Interactive command: %r', ' '.join(cmd))
 
     try:
         process = get_process(cmd, env)
@@ -198,14 +198,14 @@ def run_interactive_command(cmd, env = {}):
         sys.stdout.flush()
 
         rc = process.poll()
-        return rc;
+        return rc
 
     except KeyboardInterrupt:
         logging.info('Received keyboard interrupt')
-        return None;
+        return None
 
 def run_noninteractive_command(cmd, env = {}):
-    logging.debug('Non-interactive command: ' + ' '.join(cmd))
+    logging.debug('Non-interactive command: %r', ' '.join(cmd))
 
     try:
         process = get_process(cmd, env)
@@ -219,7 +219,7 @@ def run_noninteractive_command(cmd, env = {}):
             sys.stdout.flush()
 
         rc = process.poll()
-        return rc;
+        return rc
 
     except KeyboardInterrupt:
         logging.info('Received keyboard interrupt')
@@ -243,14 +243,14 @@ def run_hooks(config, env, hook_name):
         return True
 
     if (hook_name not in config['hooks']):
-        logging.debug('No ' + hook_name + ' hooks to run')
+        logging.debug('No %r hooks to run', hook_name)
         return True
 
     hooks = config['hooks'][hook_name]
 
     successful = True
     for hook_cmd in hooks:
-        logging.debug('Running ' + hook_name + ' hook: ' + hook_cmd)
+        logging.debug('Running %r hook: %r', hook_name, hook_cmd)
         try:
             rc = run_hook(hook_cmd, env)
         except subprocess.CalledProcessError as err:
@@ -262,7 +262,7 @@ def run_hooks(config, env, hook_name):
 
 def run_cmd_hooks(config, env, hook_name):
     if not run_hooks(config, env, hook_name):
-        fatal_exit('One or more \'' + hook_name + '\' hooks failed.')
+        fatal_exit("One or more '%s' hooks failed.", hook_name)
 
 def get_cmd_arg(prop, config):
     arg = config_args[prop]
@@ -302,7 +302,7 @@ def get_base_cmd(command, config):
 
     cmd += [command]
 
-    return cmd;
+    return cmd
 
 def get_base_env(config):
     env = {
@@ -482,7 +482,7 @@ def cmd_version(command, config, args):
 
     run_cmd_hooks(config, {}, 'pre_repo')
     run_cmd_hooks(config, {}, 'pre_' + command)
-    print(__PROG__ + ' ' + __VERSION__)
+    print(__PROG__ + ' ' + __version__)
     print('python ' + platform.python_version())
     rc = run_noninteractive_command(cmd, {})
     run_cmd_hooks(config, {}, 'post_' + command)
@@ -514,13 +514,13 @@ def main(args, loglevel):
 
     config_path = get_config_file_path(args)
 
-    logging.debug('Using config file: ' + config_path);
+    logging.debug('Using config file: ' + config_path)
 
     try:
         with open(config_path) as config_file:
             config = json.load(config_file)
     except json.decoder.JSONDecodeError as err:
-        fatal_exit('Invalid JSON in config file ' + config_path + '\n  ' + str(err));
+        fatal_exit('Invalid JSON in config file %s\n   %s', config_path, err)
 
     profile_config = get_profile_config(config, args.profile)
 
@@ -548,7 +548,7 @@ if __name__ == '__main__':
         '-V',
         '--version',
         action='version',
-        version='%(prog)s ' + __VERSION__,
+        version='%(prog)s ' + __version__,
     )
 
     parser.add_argument(
